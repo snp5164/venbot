@@ -2,7 +2,7 @@ import { AnyTextableChannel, ComponentInteraction, ComponentTypes, InteractionTy
 
 import { handleInteraction, registerMessageCommand } from "~/SlashCommands";
 
-import { buildFaqEmbed, fetchFaq } from "./faq";
+import { buildFaqComponents, fetchFaq } from "./faq";
 import { buildIssueEmbed, findThreads } from "./knownIssues";
 import { SupportInstructions, SupportTagList } from "./support";
 
@@ -123,10 +123,7 @@ handleInteraction({
                     if (!faq)
                         throw new Error("Unmatched faq question: " + choice);
 
-                    await interaction.channel.createMessage({
-                        ...replyOptions,
-                        embeds: [buildFaqEmbed(faq, interaction.user)],
-                    });
+                    await interaction.channel.createMessage(buildFaqComponents(faq, interaction.user, replyOptions));
                     break;
                 case Commands.Issue:
                     const threads = await findThreads();

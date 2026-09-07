@@ -1,10 +1,12 @@
-import { EmbedOptions, User } from "oceanic.js";
-import { TextDisplay } from "~components";
+import { CreateMessageOptions, GuildComponentSelectMenuInteraction, InteractionTypes, MessageFlags, SeparatorSpacingSize, User } from "oceanic.js";
+import { ActionRow, ComponentMessage, Container, Separator, StringOption, StringSelect, TextDisplay } from "~components";
 
 import { defineCommand } from "~/Commands";
-import { SUPPORT_ALLOWED_CHANNELS, VENCORD_SITE } from "~/constants";
+import { Emoji, SUPPORT_ALLOWED_CHANNELS, VENCORD_SITE } from "~/constants";
+import { handleInteraction } from "~/SlashCommands";
 import { makeCachedJsonFetch } from "~/util/fetch";
 import { run, silently } from "~/util/functions";
+import { paginators } from "~/util/Paginator";
 import { PaginatorCv2 } from "~/util/PaginatorCv2";
 import { toInlineCode } from "~/util/text";
 
@@ -16,19 +18,18 @@ interface Faq {
 
 export const fetchFaq = makeCachedJsonFetch<Faq[]>(VENCORD_SITE + "/faq.json");
 
-export function buildFaqEmbed(faq: Faq, invoker: User): EmbedOptions {
-    return {
-        title: faq.question,
-        description:
-            faq.answer
-                // temporarily replace newlines inside codeblocks with a placeholder, so the second replace
-                // doesn't remove them
-                .replace(/```.+?```/gs, m => m.replaceAll("\n", "%NEWLINE%"))
-                .replace(/(?<!\n)\n(?![\n\-*])/g, "")
-                .replaceAll("%NEWLINE%", "\n"),
-        color: 0xdd7878,
-        footer: { text: `Auto-response invoked by ${invoker.tag}` },
-    };
+export function buildFaqComponents(faq: Faq, invoker: User, options: CreateMessageOptions): CreateMessageOptions {
+    return (
+        <ComponentMessage {...options}>
+            <Container accentColor={0xdd7878}>
+                <TextDisplay># {faq.question}</TextDisplay>
+                <TextDisplay>{faq.answer}</TextDisplay>
+
+                <Separator spacing={SeparatorSpacingSize.SMALL} />
+                <TextDisplay>-# Auto-response invoked by {invoker.tag}</TextDisplay>
+            </Container>
+        </ComponentMessage>
+    );
 }
 
 defineCommand({
@@ -59,11 +60,12 @@ defineCommand({
             const isReply = !!msg.referencedMessage;
             if (isReply) silently(msg.delete());
 
-            return createMessage({
-                messageReference: { messageID: msg.referencedMessage?.id ?? msg.id },
-                allowedMentions: { repliedUser: isReply },
-                embeds: [buildFaqEmbed(match, msg.author)],
-            });
+            return createMessage(
+                buildFaqComponents(match, msg.author, {
+                    messageReference: { messageID: msg.referencedMessage?.id ?? msg.id },
+                    allowedMentions: { repliedUser: isReply }
+                })
+            );
         }
 
         const paginator = new PaginatorCv2<Faq>(
@@ -82,9 +84,35 @@ defineCommand({
         );
         paginator.getTitle = page => faq[page].question;
         paginator.renderTableOfContents = async pageCount => {
-            return faq.map((faq, i) => `${i + 1}. ${faq.question}`).join("\n");
+            return (
+                <>
+                    <TextDisplay>{faq.map((faq, i) => `${i + 1}. ${faq.question}`).join("\n")}</TextDisplay>
+                    <ActionRow>
+                        <StringSelect customID={`faq:select:${paginator.id}`} placeholder="Select a question">
+                            {faq.map((faq, idx) => <StringOption label={faq.question} value={String(idx)} />)}
+                        </StringSelect>
+                    </ActionRow>
+                </>);
         };
 
         await paginator.create(msg);
     },
+});
+
+handleInteraction({
+    type: InteractionTypes.MESSAGE_COMPONENT,
+    isMatch: i => i.data.customID.startsWith("faq:select:"),
+    async handle(interaction) {
+        const [, , id] = interaction.data.customID.split(":");
+        const paginator = paginators.get(id);
+        if (!paginator) return;
+
+        if (interaction.user.id !== paginator.userId)
+            return interaction.reply({
+                content: `This select menu is not for you! ${Emoji.Anger}`,
+                flags: MessageFlags.EPHEMERAL
+            });
+
+        paginator.navigateTo(Number((interaction as GuildComponentSelectMenuInteraction).data.values.getStrings()[0]));
+    }
 });
