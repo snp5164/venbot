@@ -6,8 +6,8 @@ import Config from "./config";
 import { Emoji, Millis } from "./constants";
 import { BotState } from "./db/botState";
 import { emojiCacheReady, ensureEmojis, getEmojiForReaction } from "./modules/emojiManager";
-import { moderateMessage } from "./modules/moderation";
-import { lobotomiseMaybe } from "./modules/moderation/lobotomy";
+//import { moderateMessage } from "./modules/moderation";
+//import { lobotomiseMaybe } from "./modules/moderation/lobotomy";
 import { Deduper } from "./util/Deduper";
 import { reply } from "./util/discord";
 import { silently } from "./util/functions";
@@ -65,7 +65,7 @@ const IntroCooldown = new Deduper(30 * Millis.MINUTE);
 async function handleIntroduction(msg: Message) {
     if (!msg.inCachedGuildChannel() || msg.channel.parentID === "1108135649699180705" /* support */) return;
 
-    if (msg.content && Math.random() > 0.9 && IntroRegex.test(msg.content) && !IntroCooldown.getOrAdd(msg.author.id)) {
+    if (msg.content && Math.random() > 0.99 && IntroRegex.test(msg.content) && !IntroCooldown.getOrAdd(msg.author.id)) {
         const [, name] = msg.content.match(IntroRegex)!;
         if (await silently(msg.member.edit({ nick: name }))) {
             reply(msg, { content: `Hi ${name}!` });
@@ -74,11 +74,11 @@ async function handleIntroduction(msg: Message) {
 }
 
 async function handleMessage(msg: Message, isEdit: boolean) {
-    if (msg.inCachedGuildChannel() && await lobotomiseMaybe(msg)) return;
-    if (msg.author.bot && msg.author.id !== GEN_AI_ID) return;
+    //if (msg.inCachedGuildChannel() && await lobotomiseMaybe(msg)) return;
+    //if (msg.author.bot && msg.author.id !== GEN_AI_ID) return;
 
-    moderateMessage(msg, isEdit);
-    handleIntroduction(msg);
+    //moderateMessage(msg, isEdit);
+    //handleIntroduction(msg);
 
     await emojiCacheReady;
 

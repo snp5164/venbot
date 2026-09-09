@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 import { readdir } from "fs/promises";
-import { join } from "path";
+import { join } from "path/posix";
 
 /**
  * @type {esbuild.Plugin}

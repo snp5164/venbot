@@ -1,46 +1,41 @@
 const Config = {
     "token": "",
-    "prefixes": ["v!", "v?", "v.", "v"],
+    "prefixes": ["v!", "v?", "v.", "v", "g!", "g?", "g.", "g"],
     // id of the home guild of the bot. used for registering commands, etc
-    "homeGuildId": "1015060230222131221",
+    "homeGuildId": "834760312623202324",
     // "development" | "production"
     "mode": "development",
 
     "channels": {
         // channel where venbot will post automatic moderation logs, leave empty to disable
-        "autoModLog": "1156349646965325824",
+        "autoModLog": "1465030045243543622",
 
         // channel where venbot will post moderation logs (like ban, mute, etc), leave empty to disable
-        "modLog": "1156349646965325824",
+        "modLog": "1465030045243543622",
 
         // channel where venbot will post bot audit logs (badge changes, etc), leave empty to disable
-        "botAuditLog": "1450180761679302676",
+        "botAuditLog": "1465030045243543622",
 
         // channel where venbot will send information like errors
-        "dev": "1033680203433660458",
+        "dev": "1465030045243543622",
 
         // used as default for the not-support command and some other features
-        "support": "1026515880080842772",
+        "support": "1465030396092747942",
 
         // channels where support commands are allowed.
         // always includes channels.dev and channels.support
         "supportAllowedChannels": [
-            "1345457031426871417", // vesktop support
-            "1024286218801926184", // bot spam
+            "1458956420832821475", // bot spam
         ],
     },
 
     "roles": {
         // anyone with this role can execute moderation commands
-        "mod": "1026509424686284924",
+        "mod": "1465052815352266824",
         // anyone with this role has limited access to moderation commands like mute
         "helper": "1244313853357981787",
-        // used for github linking and some other things
-        "donor": "1042507929485586532",
-        // used for github linking and some other things
-        "contributor": "1026534353167208489",
         // used for regular cotd
-        "regular": "1026504932959977532",
+        "regular": "1451983173696225370",
 
         // roles that can be added or removed using the role management commands.
         // always includes roles.donor, roles.regular, and roles.contributor
@@ -91,7 +86,7 @@ const Config = {
 
     "xp": {
         "eligibleCategories": [
-            "1015060231060983889", // chat
+            "1166300602708525066", // chat
             "1216095839848501338", // vencord development
             "1108135649699180705" // support
         ],
@@ -124,10 +119,9 @@ const Config = {
         "enabled": false,
         "apiKey": "",
         "allowedRoles": [
-            "1026509424686284924", // mod
-            "1042507929485586532", // donor
-            "1026534353167208489", // contributor
-            "1026504932959977532", // regular
+            "1465052815352266824", // mod
+            "1451983173696225370", // regular
+            "1465068569795625225" // ai pass
         ],
         "bannedRoles": [
             "1427368278866792669", // no ai
@@ -146,7 +140,7 @@ const Config = {
     },
 
     "modmail": {
-        "enabled": true,
+        "enabled": false,
         "channelId": "1161412933050437682",
         "logChannelId": "1161449871182659655",
         // role that will be mentioned (without ping) in new tickets to pull everyone into the thread
@@ -158,7 +152,7 @@ const Config = {
     // http server used for some features.
     // github linking and reporter both depend on this server
     "httpServer": {
-        "enabled": true,
+        "enabled": false,
         "port": 8152,
         "domain": "http://localhost:8152"
     },

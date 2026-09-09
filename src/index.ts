@@ -11,13 +11,13 @@ import {
 import { Vaius } from "./Client";
 import { PROD } from "./constants";
 
-import { initModListeners } from "./modules/moderation/listeners";
+//import { initModListeners } from "./modules/moderation/listeners";
 import { silently } from "./util/functions";
 import { inspect } from "./util/inspect";
 import { logDevDebug } from "./util/logAction";
 import { toCodeblock } from "./util/text";
 
-initModListeners();
+//initModListeners();
 
 export async function handleError(title: string, err: unknown) {
     if (err instanceof DiscordHTTPError && err.status >= 500)

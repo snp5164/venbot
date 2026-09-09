@@ -1,8 +1,8 @@
-# Venbot
+# Venbot (but slightly different)
 
 Venbot is a Discord bot used on the [Vencord](https://vencord.dev) Discord server.
 
-This bot is very specialised for the Vencord server and its community, so it might not be very useful for other servers.
+This bot is very specialised for the Vencord server and its community, ~~so it might not be very useful for other servers.~~ and this is a fork made to add features to the instance I run for my own server. Don't expectmany new features though.
 
 Nevertheless it is still available under a free software license so you can easily audit and modify it!
 
@@ -19,10 +19,15 @@ Prequisites: git, nodejs, pnpm
 1. Run `pnpm install` to install dependencies
 2. Run `pnpm start` to start the bot
 
-## Running as a service
+## Running with pm2
 
-1. Copy `assets/examples/venbot.service` to your systemd service directory. Tweak the `WorkingDirectory` value to wherever you cloned the repo.
-2. Enable & Start the `venbot` systemd service via `systemctl [--user] enable --now venbot`
+Running the bot as a systemd service did not work for me when I first started using my own instance for some reason, and I have instead opted to use pm2 to start the bot after turning on the VPS it runs on. The restart command was changed to run the `pm2 restart` command instead of letting process.exit(0) and systemd do their thing.
+
+Assuming you have pm2 installed on your system and `pm2 startup` is configured, the steps are:
+
+1. `cd` into `/path/to/venbot`
+2. Run `pm2 start pnpm --name venbot -- start`
+3. Run `pm2 save`
 
 ## HTTP Server
 
