@@ -33,10 +33,10 @@ registerChatInputCommand({
     name: "me",
     description: "Send a message",
     options: <>
-        <CommandStringOption name="content" description = "The message content" required maxLength={ 2000} />
-        <CommandAttachmentOption name="attachment" description = "An optional attachment" />
-            <CommandStringOption name="attachment-url" description = "A URL to an attachment" />
-                </>
+        <CommandStringOption name="content" description="The message content" required maxLength={2000} />
+        <CommandAttachmentOption name="attachment" description="An optional attachment" />
+        <CommandStringOption name="attachment-url" description="A URL to an attachment" />
+    </>
 }, {
     async handle(interaction) {
         const content = interaction.data.options.getString("content", true);
@@ -52,19 +52,19 @@ registerChatInputCommand({
         await interaction.defer();
 
         return interaction.reply(
-            <ComponentMessage files={ attachment && [attachment]}>
-<Container>
-<TextDisplay>{ content } </TextDisplay>
-                    { attachment &&
-    (attachment.type.startsWith("image/") || attachment.type.startsWith("video/")
-        ? <MediaGallery><MediaGalleryItem url={`attachment://${attachment.name}`} /></MediaGallery >
-                            : <FileComponent filename={ attachment.name } />
+            <ComponentMessage files={attachment && [attachment]}>
+                <Container>
+                    <TextDisplay>{content} </TextDisplay>
+                    {attachment &&
+                        (attachment.type.startsWith("image/") || attachment.type.startsWith("video/")
+                            ? <MediaGallery><MediaGalleryItem url={`attachment://${attachment.name}`} /></MediaGallery >
+                            : <FileComponent filename={attachment.name} />
                         )
                     }
-<Separator spacing={ SeparatorSpacingSize.LARGE; } />
-    < TextDisplay > -# ~{ interaction.user.tag } </TextDisplay>
-        </Container>
-        </ComponentMessage>
+                    <Separator spacing={SeparatorSpacingSize.LARGE} />
+                    < TextDisplay > -# ~{interaction.user.tag} </TextDisplay>
+                </Container>
+            </ComponentMessage>
         );
     },
 });
