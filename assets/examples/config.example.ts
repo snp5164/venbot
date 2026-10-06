@@ -134,6 +134,13 @@ const Config = {
         "apiKey": "", // Anthropic Platform API key
     },
 
+    // vllama command, talks to an OpenAI-compatible llama.cpp server. Uses gemini's allowedRoles and bannedRoles.
+    // Leave apiKey or baseUrl empty to disable.
+    "llama": {
+        "baseUrl": "", // e.g. https://llama.example.com (without /v1)
+        "apiKey": "",
+    },
+
     // Wolfram Alpha command. Leave appId empty to disable.
     "wolfram": {
         "appId": "", // Short Answers API
