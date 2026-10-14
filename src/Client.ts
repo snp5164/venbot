@@ -77,7 +77,7 @@ async function handleMessage(msg: Message, isEdit: boolean) {
     //if (msg.inCachedGuildChannel() && await lobotomiseMaybe(msg)) return;
     //if (msg.author.bot && msg.author.id !== GEN_AI_ID) return;
 
-    moderateMessage(msg, isEdit);
+    // moderateMessage(msg, isEdit);
     handleIntroduction(msg);
 
     await emojiCacheReady;

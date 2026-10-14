@@ -14,10 +14,10 @@ const Config = {
         "modLog": "1465030045243543622",
 
         // channel where venbot will post bot audit logs (badge changes, etc), leave empty to disable
-        "botAuditLog": "1465030045243543622",
+        "botAuditLog": "1559921542807162990",
 
         // channel where venbot will send information like errors
-        "dev": "1465030045243543622",
+        "dev": "1559921542807162990",
 
         // used as default for the not-support command and some other features
         "support": "1465030396092747942",
@@ -34,6 +34,8 @@ const Config = {
         "mod": "1465052815352266824",
         // anyone with this role has limited access to moderation commands like mute
         "helper": "1244313853357981787",
+        // used for github linking and some other things
+        "donor": "1518178607577563218",
         // used for regular cotd
         "regular": "1451983173696225370",
 

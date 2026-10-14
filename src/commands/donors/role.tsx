@@ -8,7 +8,7 @@ import { PROD } from "../../constants";
 import { fetchBuffer } from "../../util/fetch";
 
 const Name = PROD ? "role-add" : "devrole-add";
-const description = "fuck you discord";
+const description = "add a custom role for a user";
 
 registerChatInputCommand(
     {
@@ -46,7 +46,7 @@ registerChatInputCommand(
                 icon: iconBuf,
                 hoist: false,
                 mentionable: false,
-                reason: `Donor Role for ${user.tag}`,
+                reason: `Custom Role for ${user.tag}`,
                 permissions: "0"
             });
 
@@ -55,12 +55,10 @@ registerChatInputCommand(
                 position: i.guild.roles.get(Config.roles.donor)!.position + 1
             }]);
 
-            await i.guild.addMemberRole(user.id, role.id, "Custom Donor Role");
-            await i.guild.addMemberRole(user.id, Config.roles.donor, "Donor Role");
+            await i.guild.addMemberRole(user.id, role.id, "Custom Role");
 
             await i.createFollowup({
-                content: "Done!",
-                flags: MessageFlags.EPHEMERAL
+                content: "Created role <@&" + role.id + "> for <@" + user.id + ">!",
             });
         }
     }
