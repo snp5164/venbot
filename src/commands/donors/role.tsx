@@ -1,4 +1,3 @@
-import { MessageFlags } from "oceanic.js";
 
 import { registerChatInputCommand } from "~/SlashCommands";
 
@@ -26,8 +25,6 @@ registerChatInputCommand(
     {
         guildOnly: true,
         async handle(i) {
-            await i.defer(MessageFlags.EPHEMERAL);
-
             const opts = i.data.options;
             const user = opts.getUser("user", true);
             const name = opts.getString("name", true);
