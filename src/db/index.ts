@@ -28,3 +28,9 @@ export const enum ExpressionFormatType {
     GIF = "gif",
     LOTTIE = "lottie"
 }
+
+export enum AutoResponseContentType {
+    ALL = "all",
+    TEXT = "text",
+    IMAGES = "images"
+}

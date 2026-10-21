@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { cpSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
-import { MessageFlags } from "oceanic.js";
+import { ApplicationCommandOptionTypes, MessageFlags } from "oceanic.js";
 
 import { ZWSP } from "~/constants";
 import { ChatInputCommandOptions, CommandInteractionHandler, registerChatInputCommand } from "~/SlashCommands";
@@ -9,11 +9,11 @@ import { parseBulkBadges } from "./parseBulkBadges";
 
 import sharp from "sharp";
 import Config from "~/config";
+import { OwnerId } from "~/owner";
 import { atomicWriteFileSync } from "~/util/atomicWriteFile";
 import { getHomeGuild } from "~/util/discord";
 import { logBotAuditAction } from "~/util/logAction";
 import { CommandAttachmentOption, CommandBooleanOption, CommandIntegerOption, CommandStringOption, CommandUserOption } from "~components";
-import { OwnerId } from "../../Client";
 import { PROD } from "../../constants";
 import { fetchBuffer } from "../../util/fetch";
 
@@ -35,14 +35,7 @@ const BadgeData: Record<string, Array<BadgeInfo>> = run(() => {
 
 const saveBadges = () => atomicWriteFileSync(BadgeJson, JSON.stringify(BadgeData));
 
-const Name = PROD ? "badge" : "devbadge";
-const NameAdd = Name + "-add";
-const NameEdit = Name + "-edit";
-const NameRemove = Name + "-remove";
-const NameRemoveAll = Name + "-remove-all";
-const NameMove = Name + "-move";
-const NameCopy = Name + "-copy";
-const NameBulkAdd = Name + "-bulk-add";
+const COMMAND_NAME = PROD ? "badge" : "devbadge";
 
 async function optimizeImage(imgData: Buffer, ext: string) {
     const img = sharp(imgData, {
@@ -120,12 +113,14 @@ function writeBadgeImage(userId: string, fileName: string, imgData: Buffer) {
 
 const handler: CommandInteractionHandler = {
     async handle(i) {
+        const [subCommand] = i.data.options.getSubCommand(true);
+
         if (i.user.id !== OwnerId) return;
 
         const { data } = i;
         const guild = i.guild ?? getHomeGuild();
 
-        if (data.name === NameCopy) {
+        if (subCommand === "copy") {
             const oldUser = data.options.getUser("old-user", true);
             const newUser = data.options.getUser("new-user", true);
 
@@ -150,7 +145,7 @@ const handler: CommandInteractionHandler = {
             });
         }
 
-        if (data.name === NameMove) {
+        if (subCommand === "move") {
             const oldUser = data.options.getUser("old-user", true);
             const newUser = data.options.getUser("new-user", true);
 
@@ -202,7 +197,7 @@ const handler: CommandInteractionHandler = {
         const user = data.options.getUser("user", true);
         const existingBadgeIndex = data.options.getInteger("badge");
 
-        if (data.name === NameRemoveAll) {
+        if (subCommand === "remove-all") {
             if (!BadgeData[user.id]?.length)
                 return i.createMessage({
                     content: "No badges found",
@@ -223,7 +218,7 @@ const handler: CommandInteractionHandler = {
             });
         }
 
-        if (data.name === NameRemove) {
+        if (subCommand === "remove") {
             const existingBadge = BadgeData[user.id][existingBadgeIndex!];
             if (!existingBadge) return i.createMessage({
                 content: "Badge not found",
@@ -258,9 +253,9 @@ const handler: CommandInteractionHandler = {
             });
         }
 
-        if (data.name === NameBulkAdd) {
+        if (subCommand === "add-bulk") {
             const text = data.options.getString("text", true);
-            const optimize = data.options.getBoolean("optimize") ?? false;
+            const optimize = data.options.getBoolean("optimize") ?? true;
 
             i.defer(MessageFlags.EPHEMERAL);
 
@@ -337,7 +332,6 @@ const handler: CommandInteractionHandler = {
         let tooltip = data.options.getString("tooltip");
         const image = data.options.getAttachment("image");
         const imageUrl = data.options.getString("image-url");
-        const optimize = data.options.getBoolean("optimize") ?? false;
 
         let url = image?.url ?? imageUrl;
         url &&= normaliseCdnUrl(url);
@@ -353,6 +347,8 @@ const handler: CommandInteractionHandler = {
             url ??= existing.badge;
             tooltip ??= existing.tooltip;
         }
+
+        const optimize = data.options.getBoolean("optimize") ?? !url.includes(".svg");
 
         i.defer(MessageFlags.EPHEMERAL);
 
@@ -405,7 +401,7 @@ const handler: CommandInteractionHandler = {
         }
 
         logBotAuditAction({
-            content: `Badge ${data.name === NameEdit ? "edited" : "added"} for ${user.username} (${user.mention})`,
+            content: `Badge ${subCommand === "edit" ? "edited" : "added"} for ${user.username} (${user.mention})`,
             files: [{
                 name: fileName,
                 contents: imgData
@@ -453,54 +449,67 @@ const makeTooltip = (required: boolean) => <CommandStringOption name="tooltip" r
 const makeExistingBadge = (name: string, required = true) => <CommandIntegerOption name={name} required={required} autocomplete />;
 
 registerCommand({
-    name: NameAdd,
+    name: COMMAND_NAME,
     options: [
-        RequiredUser,
-        makeTooltip(true),
-        ImageUrl,
-        Image,
-        makeExistingBadge("before", false),
-        Optimize
-    ]
-});
-
-registerCommand({
-    name: NameEdit,
-    options: [
-        RequiredUser,
-        makeExistingBadge("badge"),
-        makeTooltip(false),
-        ImageUrl,
-        Image,
-        Optimize
-    ]
-});
-
-registerCommand({
-    name: NameRemove,
-    options: [RequiredUser, makeExistingBadge("badge")]
-});
-
-registerCommand({
-    name: NameRemoveAll,
-    options: [RequiredUser]
-});
-
-registerCommand({
-    name: NameMove,
-    options: [OldUser, NewUser]
-});
-
-registerCommand({
-    name: NameCopy,
-    options: [OldUser, NewUser]
-});
-
-registerCommand({
-    name: NameBulkAdd,
-    options: [
-        RequiredUser,
-        <CommandStringOption name="text" required description="The text to parse for badges" />,
-        Optimize
+        {
+            name: "add",
+            description: "Add a new badge",
+            type: ApplicationCommandOptionTypes.SUB_COMMAND,
+            options: [
+                RequiredUser,
+                makeTooltip(true),
+                ImageUrl,
+                Image,
+                makeExistingBadge("before", false),
+                Optimize
+            ]
+        },
+        {
+            name: "edit",
+            description: "Edit an existing badge",
+            type: ApplicationCommandOptionTypes.SUB_COMMAND,
+            options: [
+                RequiredUser,
+                makeExistingBadge("badge"),
+                makeTooltip(false),
+                ImageUrl,
+                Image,
+                Optimize
+            ]
+        },
+        {
+            name: "remove",
+            description: "Remove an existing badge",
+            type: ApplicationCommandOptionTypes.SUB_COMMAND,
+            options: [RequiredUser, makeExistingBadge("badge")]
+        },
+        {
+            name: "remove-all",
+            description: "Remove all badges from a user",
+            type: ApplicationCommandOptionTypes.SUB_COMMAND,
+            options: [RequiredUser]
+        },
+        {
+            name: "move",
+            description: "Move a badge from one user to another",
+            type: ApplicationCommandOptionTypes.SUB_COMMAND,
+            options: [OldUser, NewUser]
+        },
+        {
+            name: "copy",
+            description: "Copy a badge from one user to another",
+            type: ApplicationCommandOptionTypes.SUB_COMMAND,
+            options: [OldUser, NewUser]
+        },
+        {
+            name: "add-bulk",
+            description: "Add multiple badges to a user at once",
+            type: ApplicationCommandOptionTypes.SUB_COMMAND,
+            options: [
+                RequiredUser,
+                <CommandStringOption name="text" required description="The text to parse for badges" />,
+                Optimize
+            ]
+        }
     ]
 });
