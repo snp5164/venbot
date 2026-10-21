@@ -5,8 +5,8 @@ import Config from "./config";
 import { Emoji, Millis } from "./constants";
 import { BotState } from "./db/botState";
 import { emojiCacheReady, ensureEmojis, getEmojiForReaction } from "./modules/emojiManager";
-import { ocrMessage } from "./modules/messageOcr";
-//import { moderateMessage } from "./modules/moderation";
+// import { ocrMessage } from "./modules/messageOcr";
+// import { moderateMessage } from "./modules/moderation";
 import { OwnerId, setOwnerId } from "./owner";
 import { Deduper } from "./util/Deduper";
 import { messageContainsText, reply } from "./util/discord";
@@ -67,7 +67,7 @@ async function handleMessage(msg: Message, isEdit: boolean) {
     if (msg.author.bot && msg.author.id !== GEN_AI_ID) return;
 
     // moderateMessage(msg, isEdit);
-    ocrMessage(msg);
+    // ocrMessage(msg);
     handleIntroduction(msg);
 
     await emojiCacheReady;

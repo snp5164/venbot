@@ -1,4 +1,3 @@
-
 import { registerChatInputCommand } from "~/SlashCommands";
 
 import Config from "~/config";
@@ -25,6 +24,8 @@ registerChatInputCommand(
     {
         guildOnly: true,
         async handle(i) {
+            await i.defer();
+
             const opts = i.data.options;
             const user = opts.getUser("user", true);
             const name = opts.getString("name", true);
