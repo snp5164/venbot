@@ -12,7 +12,9 @@ const ignoreRoles = new Set([
     "1017523851342663783", // Server Booster
     "1093506400853950525", // manager
     "1026509424686284924", // mod perms
+    "1273266391449079858", // mod cosmetic role
     "1244313853357981787", // support perms
+    "1484681799136444446", // support cosmetic role
 ]);
 
 const shouldIgnoreRole = (roleId: string, guild: Guild) => ignoreRoles.has(roleId) || !!guild.roles.get(roleId)?.managed;
@@ -78,7 +80,7 @@ defineCommand({
     async execute({ msg }) {
         if (msg.guildID !== Config.homeGuildId) return;
 
-        const members = await msg.guild.fetchMembers();
+        const members = await msg.guild.requestMembers();
 
         const rows = members
             .map(m => {

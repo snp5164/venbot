@@ -12,6 +12,7 @@ import Config from "~/config";
 import { OwnerId } from "~/owner";
 import { atomicWriteFileSync } from "~/util/atomicWriteFile";
 import { getHomeGuild } from "~/util/discord";
+import { lookupKlipyURL, lookupTenorURL } from "~/util/gifs";
 import { logBotAuditAction } from "~/util/logAction";
 import { CommandAttachmentOption, CommandBooleanOption, CommandIntegerOption, CommandStringOption, CommandUserOption } from "~components";
 import { PROD } from "../../constants";
@@ -24,6 +25,8 @@ const badgesForUser = (userId: string) => `${BasePath}/badges/${userId}`;
 interface BadgeInfo {
     tooltip?: string;
     badge: string;
+    /** Indicates that a 2x resolution variant of the badge image exists */
+    "2"?: 1;
 }
 const BadgeData: Record<string, Array<BadgeInfo>> = run(() => {
     try {
@@ -44,53 +47,70 @@ async function optimizeImage(imgData: Buffer, ext: string) {
     });
 
     const { width, height } = await img.metadata();
-    const size = Math.min(width, height, 128);
+    const originalSize = Math.min(width, height);
+    const size = Math.min(originalSize, 128);
+    const size2x = Math.min(originalSize, 256);
 
-    const res = await img
-        .resize(size, size, {
-            fit: "cover",
-            position: "centre",
-            kernel: "lanczos3",
-        })
-        .webp({
-            quality: 30,
-            alphaQuality: 90,
-            effort: 6,
-            mixed: true,
-            loop: 0
-        })
-        .toBuffer();
+    const resizeOptions = {
+        fit: "cover",
+        position: "centre",
+        kernel: "lanczos3",
+    } as const;
 
-    const isGiga = res.byteLength < imgData.byteLength;
+    const webpOptions = {
+        quality: 30,
+        alphaQuality: 90,
+        effort: 6,
+        mixed: true,
+        loop: 0
+    } as const;
+
+    const [res, res2x] = await Promise.all([
+        img.clone()
+            .resize(size, size, resizeOptions)
+            .webp(webpOptions)
+            .toBuffer(),
+        // Never upscale, and don't create a 2x variant for images that are already 128px or smaller
+        originalSize < 128
+            ? undefined
+            : img.clone()
+                .resize(size2x, size2x, resizeOptions)
+                .webp(webpOptions)
+                .toBuffer()
+    ]);
 
     return [
-        isGiga ? res : imgData,
-        isGiga ? "webp" : ext,
+        res,
+        res2x,
+        "webp",
         imgData.byteLength,
         res.byteLength
     ] as const;
 }
 
-function normaliseCdnUrl(rawUrl: string) {
+async function normaliseUrl(rawUrl: string) {
     const url = new URL(rawUrl);
+    if (url.host === "tenor.com") return lookupTenorURL(url);
+    if (url.host === "klipy.com") return lookupKlipyURL(url);
     if (url.host !== "cdn.discordapp.com" || url.pathname.includes("/attachments/")) return rawUrl;
 
-    url.searchParams.set("size", "128");
+    url.searchParams.set("size", "256");
 
     return url.toString();
 }
 
 async function fetchAndProcessBadgeImage(rawUrl: string, userId: string, optimize: boolean) {
-    const url = normaliseCdnUrl(rawUrl);
+    const url = await normaliseUrl(rawUrl);
 
     let imgData: Buffer = await fetchBuffer(url);
+    let imgData2x: Buffer | undefined;
     let ext = new URL(url).pathname.split(".").pop()!;
 
     let before = imgData.byteLength;
     let after = imgData.byteLength;
 
     if (optimize) {
-        ([imgData, ext, before, after] = await optimizeImage(imgData, ext));
+        ([imgData, imgData2x, ext, before, after] = await optimizeImage(imgData, ext));
     }
 
     const hash = createHash("sha1").update(imgData).digest("hex");
@@ -99,16 +119,29 @@ async function fetchAndProcessBadgeImage(rawUrl: string, userId: string, optimiz
     return {
         fileName,
         imgData,
+        imgData2x,
         before,
         after,
         badgeUrl: `https://badges.vencord.dev/badges/${userId}/${fileName}`
     };
 }
 
+const get2xFileName = (fileName: string) => {
+    const extIndex = fileName.lastIndexOf(".");
+    return `${fileName.slice(0, extIndex)}@2x${fileName.slice(extIndex)}`;
+};
+
 /** Writes a processed badge image to disk. Kept separate so writes can be done in order. */
-function writeBadgeImage(userId: string, fileName: string, imgData: Buffer) {
+function writeBadgeImage(userId: string, fileName: string, imgData: Buffer, imgData2x?: Buffer) {
     mkdirSync(badgesForUser(userId), { recursive: true });
     writeFileSync(`${badgesForUser(userId)}/${fileName}`, imgData);
+    if (imgData2x) writeFileSync(`${badgesForUser(userId)}/${get2xFileName(fileName)}`, imgData2x);
+}
+
+/** Removes a badge image and its 2x variant from disk. */
+function removeBadgeImage(userId: string, fileName: string) {
+    rmSync(`${badgesForUser(userId)}/${fileName}`, { force: true });
+    rmSync(`${badgesForUser(userId)}/${get2xFileName(fileName)}`, { force: true });
 }
 
 const handler: CommandInteractionHandler = {
@@ -219,7 +252,7 @@ const handler: CommandInteractionHandler = {
         }
 
         if (subCommand === "remove") {
-            const existingBadge = BadgeData[user.id][existingBadgeIndex!];
+            const existingBadge = BadgeData[user.id]?.[existingBadgeIndex!];
             if (!existingBadge) return i.createMessage({
                 content: "Badge not found",
                 flags: MessageFlags.EPHEMERAL
@@ -231,7 +264,7 @@ const handler: CommandInteractionHandler = {
             BadgeData[user.id].splice(existingBadgeIndex!, 1);
 
             if (!BadgeData[user.id].some(b => b.badge === existingBadge.badge)) {
-                rmSync(`${badgesForUser(user.id)}/${fileName}`, { force: true });
+                removeBadgeImage(user.id, fileName);
             }
 
             if (BadgeData[user.id].length === 0)
@@ -289,14 +322,15 @@ const handler: CommandInteractionHandler = {
                     continue;
                 }
 
-                const { fileName, imgData, before, after, badgeUrl, tooltip } = result;
+                const { fileName, imgData, imgData2x, before, after, badgeUrl, tooltip } = result;
 
-                writeBadgeImage(user.id, fileName, imgData);
+                writeBadgeImage(user.id, fileName, imgData, imgData2x);
 
                 totalBefore += before;
                 totalAfter += after;
 
                 const newBadgeData: BadgeInfo = { tooltip, badge: badgeUrl };
+                if (imgData2x) newBadgeData["2"] = 1;
                 if (!tooltip || tooltip === ZWSP) delete newBadgeData.tooltip;
 
                 BadgeData[user.id].push(newBadgeData);
@@ -334,7 +368,9 @@ const handler: CommandInteractionHandler = {
         const imageUrl = data.options.getString("image-url");
 
         let url = image?.url ?? imageUrl;
-        url &&= normaliseCdnUrl(url);
+        if (url) url = await normaliseUrl(url);
+
+        const hadUrl = !!url;
 
         if (!url || !tooltip) {
             const existing = existingBadgeIndex != null && BadgeData[user.id]?.[existingBadgeIndex];
@@ -348,48 +384,40 @@ const handler: CommandInteractionHandler = {
             tooltip ??= existing.tooltip;
         }
 
-        const optimize = data.options.getBoolean("optimize") ?? !url.includes(".svg");
+        const optimize = hadUrl && (data.options.getBoolean("optimize") ?? !url.includes(".svg"));
 
         i.defer(MessageFlags.EPHEMERAL);
 
-        let imgData: Buffer = await fetchBuffer(url);
-        let ext = new URL(url).pathname.split(".").pop()!;
-        let footer = "";
+        const { fileName, imgData, imgData2x, before, after, badgeUrl } = await fetchAndProcessBadgeImage(url, user.id, optimize);
 
-        if (optimize) {
-            let sizes: [number, number];
-            ([imgData, ext, ...sizes] = await optimizeImage(imgData, ext));
-
-            footer = `${(sizes[0] / 1024).toFixed(2)}k -> ${(sizes[1] / 1024).toFixed(2)}k\n`;
-        }
-
-        const hash = createHash("sha1").update(imgData).digest("hex");
+        const footer = optimize
+            ? `${(before / 1024).toFixed(2)}k -> ${(after / 1024).toFixed(2)}k\n`
+            : "";
 
         BadgeData[user.id] ??= [];
         const index = existingBadgeIndex ?? BadgeData[user.id].length;
-        const fileName = `${hash}.${ext}`;
 
         const newBadgeData: BadgeInfo = {
             tooltip: tooltip,
-            badge: `https://badges.vencord.dev/badges/${user.id}/${fileName}`
+            badge: badgeUrl
         };
+        if (imgData2x) newBadgeData["2"] = 1;
         if (!tooltip || tooltip === ZWSP) delete newBadgeData.tooltip;
 
-        const before = data.options.getInteger("before");
-        if (before != null) {
-            BadgeData[user.id].splice(before, 0, newBadgeData);
+        const beforeIndex = data.options.getInteger("before");
+        if (beforeIndex != null) {
+            BadgeData[user.id].splice(beforeIndex, 0, newBadgeData);
         } else {
             const existingBadge = BadgeData[user.id][index];
             if (existingBadge && BadgeData[user.id].filter(b => b.badge === existingBadge.badge).length === 1) {
-                const fileName = new URL(existingBadge.badge).pathname.split("/").pop()!;
-                rmSync(`${badgesForUser(user.id)}/${fileName}`, { force: true });
+                const existingFileName = new URL(existingBadge.badge).pathname.split("/").pop()!;
+                removeBadgeImage(user.id, existingFileName);
             }
 
             BadgeData[user.id][index] = newBadgeData;
         }
 
-        mkdirSync(badgesForUser(user.id), { recursive: true });
-        writeFileSync(`${badgesForUser(user.id)}/${fileName}`, imgData);
+        writeBadgeImage(user.id, fileName, imgData, imgData2x);
 
         saveBadges();
 

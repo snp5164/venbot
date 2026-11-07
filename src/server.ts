@@ -1,12 +1,13 @@
 import Fastify from "fastify";
 
+import { gitRemote } from "__gitData__";
 import { readFile } from "fs/promises";
 import Config from "./config";
 import { PROD } from "./constants";
-import { getGitRemote } from "./util/git";
 import { makeLazy } from "./util/lazy";
 
 const { enabled, port } = Config.httpServer;
+const host = process.env.HTTP_HOST ?? "127.0.0.1";
 
 export const fastify = Fastify({
     logger: !PROD && {
@@ -18,9 +19,8 @@ export const fastify = Fastify({
 
 const getIndex = makeLazy(async () => {
     const contents = await readFile("assets/index.html", "utf-8");
-    const remote = await getGitRemote();
 
-    return contents.replace("%GIT_SOURCE_URL%", remote);
+    return contents.replace("%GIT_SOURCE_URL%", gitRemote);
 });
 
 if (enabled) {
@@ -34,7 +34,7 @@ if (enabled) {
 
     // defer listen to allow for fastify plugins to be registered before starting the server
     setImmediate(() => {
-        fastify.listen({ port: port }, err => {
+        fastify.listen({ port, host }, err => {
             if (err) {
                 fastify.log.error(err);
                 process.exit(1);

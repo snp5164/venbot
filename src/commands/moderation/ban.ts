@@ -53,13 +53,10 @@ async function banExecutor({ msg, reply }: CommandContext<true>, args: string[],
     if (ids.length > 20) return reply("That's tooooo many users....");
 
     if (!reason) return reply("A reason is required");
-    if (!isSoft && (reason.toLowerCase().includes("scam") || reason.toLowerCase().includes("hacked"))) {
-        return reply("Please use `softban` for scams & hacked accounts");
-    }
 
     const reasonWithMod = `${msg.author.tag}: ${reason}`;
 
-    const members = await msg.guild.fetchMembers({ userIDs: ids });
+    const members = await msg.guild.requestMembers({ userIDs: ids });
     const restIds = ids.filter(id => !members.some(m => m.id === id));
 
     const authorHighestRolePosition = getHighestRolePosition(msg.member);

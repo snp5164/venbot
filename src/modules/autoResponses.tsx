@@ -1,12 +1,12 @@
-import { AnyTextableGuildChannel, ApplicationCommandOptionTypes, ChannelTypes, InteractionTypes, Message, MessageFlags, Permissions, TextInputStyles } from "oceanic.js";
+import { AnyTextableGuildChannel, ApplicationCommandOptionTypes, AutocompleteInteraction, ChannelTypes, InteractionTypes, Message, MessageFlags, Permissions, TextInputStyles } from "oceanic.js";
 import * as v from "valibot";
 import Config from "~/config";
-import { Emoji, PROD } from "~/constants";
+import { Colors, PROD, SUPPORT_ALLOWED_CHANNELS } from "~/constants";
 import { AutoResponseContentType, db } from "~/db";
 import { handleInteraction, registerChatInputCommand } from "~/SlashCommands";
 import { reply } from "~/util/discord";
 import { fetchJson } from "~/util/fetch";
-import { toCodeblock } from "~/util/text";
+import { toCodeblock, toInlineCode } from "~/util/text";
 import { ChannelSelect, ModalLabel, StringOption, StringSelect, TextInput } from "~components";
 
 interface AutoResponse {
@@ -16,6 +16,10 @@ interface AutoResponse {
     contentTypes: AutoResponseContentType;
     channelIds: string[];
 }
+
+const success = (description: string, flags: MessageFlags) => ({ flags, embeds: [{ color: Colors.Green, description }] });
+const failure = (description: string, flags: MessageFlags) => ({ flags, embeds: [{ color: Colors.Red, description }] });
+const warning = (description: string, flags: MessageFlags) => ({ flags, embeds: [{ color: Colors.Banana, description }] });
 
 const AutoResponseImportSchema = v.array(
     v.object({
@@ -52,18 +56,67 @@ async function loadResponses() {
 
 loadResponses();
 
-export async function maybeAutoRespond(msg: Message<AnyTextableGuildChannel>, text: string, contentType: AutoResponseContentType) {
-    if (!text) return;
+export function resolveAutoResponse(text: string, contentType: AutoResponseContentType, msg?: Message<AnyTextableGuildChannel>, ) {
+    if (!text) return null;
 
-    const response = autoResponses.find(r => {
+    return autoResponses.find(r => {
         if (r.contentTypes !== AutoResponseContentType.ALL && r.contentTypes !== contentType) return false;
-        if (r.channelIds.length && !r.channelIds.includes(msg.channel.id) && !(msg.channel.parentID && r.channelIds.includes(msg.channel.parentID))) return false;
+        if (msg && r.channelIds.length && !r.channelIds.includes(msg.channel.id) && !(msg.channel.parentID && r.channelIds.includes(msg.channel.parentID))) return false;
 
         return r.match.test(text);
-    });
+    }) ?? null;
+}
 
+export async function maybeAutoRespond(msg: Message<AnyTextableGuildChannel>, text: string, contentType: AutoResponseContentType) {
+    const response = resolveAutoResponse(text, contentType, msg);
     return response && await reply(msg, { content: `${response.response}\n\n-# This is an auto-response based on keywords detected in your message.` });
 }
+
+function autoCompleteName(interaction: AutocompleteInteraction) {
+    const name = interaction.data.options.getString("name", true);
+
+    interaction.result(
+        autoResponses
+            .filter(r => r.name.toLowerCase().includes(name.toLowerCase()))
+            .map(r => ({ name: r.name, value: r.name }))
+    );
+}
+
+registerChatInputCommand({
+    name: PROD ? "autorespond" : "dev-autorespond",
+    description: "Send an auto-response by name",
+    options: [
+        {
+            type: ApplicationCommandOptionTypes.STRING,
+            name: "name",
+            description: "The name of the auto-response to send",
+            required: true,
+            autocomplete: true
+        }
+    ]
+}, {
+    guildOnly: true,
+
+    async handle(interaction) {
+        const flags = MessageFlags.EPHEMERAL;
+
+        if (!SUPPORT_ALLOWED_CHANNELS.includes(interaction.channel.id)) {
+            await interaction.reply(failure("This command can only be used in support channels.", flags));
+            return;
+        }
+
+        const name = interaction.data.options.getString("name", true);
+        const response = autoResponses.find(r => r.name === name);
+        if (!response) {
+            await interaction.reply(failure(`Auto-response ${toInlineCode(name)} not found.`, flags));
+            return;
+        }
+
+        await interaction.reply({ content: response.response });
+    },
+
+    autoComplete: autoCompleteName
+});
 
 const allowedRoles = [Config.roles.mod, Config.roles.helper];
 
@@ -151,7 +204,7 @@ registerChatInputCommand({
                     } as Partial<AutoResponse>;
 
                 if (!existingResponse && subcommand === "edit") {
-                    await interaction.reply({ flags, content: "Auto-response not found" });
+                    await interaction.reply(failure("Auto-response not found", flags));
                     return;
                 }
 
@@ -220,11 +273,9 @@ registerChatInputCommand({
                 const didDelete = numDeletedRows > 0;
                 if (didDelete) await loadResponses();
 
-                await interaction.reply({
-                    content: didDelete
-                        ? `${Emoji.CheckMark} Auto-response "${name}" removed successfully.`
-                        : `${Emoji.X} Auto-response "${name}" not found.`
-                });
+                await interaction.reply(didDelete
+                    ? success(`Auto-response ${toInlineCode(name)} removed successfully.`, flags)
+                    : failure(`Auto-response ${toInlineCode(name)} not found.`, flags));
 
                 break;
             }
@@ -237,7 +288,7 @@ registerChatInputCommand({
 
             case "export": {
                 if (!autoResponses.length) {
-                    await interaction.reply({ content: "No auto-responses to export.", flags });
+                    await interaction.reply(warning("No auto-responses to export.", flags));
                     break;
                 }
 
@@ -261,10 +312,7 @@ registerChatInputCommand({
 
                 const parseResult = v.safeParse(AutoResponseImportSchema, data);
                 if (!parseResult.success) {
-                    await interaction.reply({
-                        flags,
-                        content: `${Emoji.X} Invalid auto-response import data format. Should have the same format as exported auto-responses.\n\n${toCodeblock(parseResult.issues[0].message)}`
-                    });
+                    await interaction.reply(failure(`Invalid auto-response import data format. Should have the same format as exported auto-responses.\n\n${toCodeblock(parseResult.issues[0].message)}`, flags));
                     break;
                 }
 
@@ -280,9 +328,9 @@ registerChatInputCommand({
                 await loadResponses();
 
                 if (Number(numInsertedOrUpdatedRows!) === parseResult.output.length) {
-                    await interaction.reply({ flags, content: `${Emoji.CheckMark} Successfully imported ${numInsertedOrUpdatedRows} auto-responses.` });
+                    await interaction.reply(success(`Successfully imported ${numInsertedOrUpdatedRows} auto-responses.`, flags));
                 } else {
-                    await interaction.reply({ flags, content: `${Emoji.RedDot} Imported ${numInsertedOrUpdatedRows!} out of ${parseResult.output.length} auto-responses.` });
+                    await interaction.reply(warning(`Imported ${numInsertedOrUpdatedRows!} out of ${parseResult.output.length} auto-responses.`, flags));
                 }
 
                 break;
@@ -290,15 +338,7 @@ registerChatInputCommand({
         }
     },
 
-    autoComplete(interaction) {
-        const name = interaction.data.options.getString("name", true);
-
-        interaction.result(
-            autoResponses
-                .filter(r => r.name.toLowerCase().includes(name.toLowerCase()))
-                .map(r => ({ name: r.name, value: r.name }))
-        );
-    }
+    autoComplete: autoCompleteName
 });
 
 handleInteraction({
@@ -342,7 +382,7 @@ handleInteraction({
                 .where("name", "=", name)
                 .executeTakeFirst();
 
-            await interaction.reply({ flags, content: `${Emoji.CheckMark} Auto-response "${name}" updated successfully.` });
+            await interaction.reply(success(`Auto-response ${toInlineCode(name)} updated successfully.`, flags));
             await loadResponses();
         } else {
             const res = await db
@@ -352,10 +392,10 @@ handleInteraction({
                 .executeTakeFirst();
 
             if (res.numInsertedOrUpdatedRows) {
-                await interaction.reply({ flags, content: `${Emoji.CheckMark} Auto-response "${name}" created successfully.` });
+                await interaction.reply(success(`Auto-response ${toInlineCode(name)} created successfully.`, flags));
                 await loadResponses();
             } else {
-                await interaction.reply({ flags, content: `${Emoji.X} Auto-response "${name}" already exists.` });
+                await interaction.reply(failure(`Auto-response ${toInlineCode(name)} already exists.`, flags));
             }
         }
     }
