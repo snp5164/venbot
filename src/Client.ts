@@ -5,6 +5,7 @@ import Config from "./config";
 import { Emoji, Millis } from "./constants";
 import { BotState } from "./db/botState";
 import { emojiCacheReady, ensureEmojis, getEmojiForReaction } from "./modules/emojiManager";
+import { handleGithubLines } from "./modules/githubLines";
 // import { ocrMessage } from "./modules/messageOcr";
 // import { moderateMessage } from "./modules/moderation";
 import { OwnerId, setOwnerId } from "./owner";
