@@ -14,7 +14,7 @@ const getSystemPrompt = makeLazy(() => readFile(join(ASSET_DIR, "gemini-system-p
 const getVerityPrompt = makeLazy(() => readFile(join(ASSET_DIR, "verity-prompt.txt"), "utf-8"));
 
 defineCommand({
-    enabled: !!apiKey,
+    enabled: Config.anthropic.enabled,
     name: "haiku",
     aliases: ["claude", "verity"],
     description: "Chat with Claude Haiku",
@@ -23,7 +23,7 @@ defineCommand({
     rawContent: true,
     rateLimit: 15 * Millis.SECOND,
     async execute({ reply, msg, commandName }, content) {
-        const { allowedRoles, bannedRoles } = Config.anthropic;
+        const { allowedRoles, bannedRoles } = Config.gemini;
         if (!msg.member.roles.some(r => allowedRoles.includes(r)) || msg.member.roles.some(r => bannedRoles.includes(r))) {
             return;
         }
