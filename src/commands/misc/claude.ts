@@ -8,7 +8,7 @@ import { makeLazy } from "~/util/lazy";
 import { toInlineCode, truncateString } from "~/util/text";
 import { fetchFaq } from "../support/faq";
 
-const apiKey = Config.anthropic?.apiKey;
+const { apiKey } = Config.anthropic;
 const model = "claude-haiku-5-5";
 const getSystemPrompt = makeLazy(() => readFile(join(ASSET_DIR, "gemini-system-prompt.txt"), "utf-8"));
 const getVerityPrompt = makeLazy(() => readFile(join(ASSET_DIR, "verity-prompt.txt"), "utf-8"));
@@ -23,7 +23,7 @@ defineCommand({
     rawContent: true,
     rateLimit: 15 * Millis.SECOND,
     async execute({ reply, msg, commandName }, content) {
-        const { allowedRoles, bannedRoles } = Config.gemini;
+        const { allowedRoles, bannedRoles } = Config.anthropic;
         if (!msg.member.roles.some(r => allowedRoles.includes(r)) || msg.member.roles.some(r => bannedRoles.includes(r))) {
             return;
         }

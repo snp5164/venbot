@@ -65,6 +65,12 @@ const ConfigSchema = pipe(
             passRoleId: optionalString()
         }),
 
+        anthropic: enabledConfig({
+            apiKey: optionalString(),
+            allowedRoles: optional(array(string()), []),
+            bannedRoles: optional(array(string()), [])
+        }),
+
         gemini: enabledConfig({
             apiKey: optionalString(),
             allowedRoles: optional(array(string()), []),
