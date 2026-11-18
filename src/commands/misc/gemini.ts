@@ -219,12 +219,16 @@ defineCommand({
             .replace("{{VENCORD_CONTEXT}}", JSON.stringify(await fetchFaq()))
             .replace("{{EMOJI_LIST}}", JSON.stringify(msg.guild.emojis.map(e => `<${e.animated ? "a" : ""}:${e.name}:${e.id}>`)));
 
+        const tsundere_inst = "Act like a tsundere. Be mean and condescending, but also secretly care about the user. Use sarcasm and playful insults, but also show moments of vulnerability and affection. Keep your responses short and to the point.";
+        const chair = "728883332854841374";
+        const extraInstruction = msg.author.id === chair ? `\n\n${tsundere_inst}` : "";
+
         const { response, model } = await generateContent({
             contents,
             config: {
                 maxOutputTokens: 4000,
                 ...(!useGemma && {
-                    systemInstruction: systemPrompt,
+                    systemInstruction: systemPrompt + extraInstruction,
                     thinkingConfig: {
                         thinkingBudget: -1
                     }

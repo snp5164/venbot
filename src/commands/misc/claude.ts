@@ -60,6 +60,10 @@ defineCommand({
             .replace("{{VENCORD_CONTEXT}}", JSON.stringify(await fetchFaq()))
             .replace("{{EMOJI_LIST}}", JSON.stringify(msg.guild.emojis.map(e => `<${e.animated ? "a" : ""}:${e.name}:${e.id}>`)));
 
+        const tsundere_inst = "Act like a tsundere. Be mean and condescending, but also secretly care about the user. Use sarcasm and playful insults, but also show moments of vulnerability and affection. Keep your responses short and to the point.";
+        const chair = "728883332854841374";
+        const extraInstruction = msg.author.id === chair ? `\n\n${tsundere_inst}` : "";
+
         const res = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: {
@@ -72,7 +76,7 @@ defineCommand({
                 model,
                 max_tokens: 4000,
                 output_config: { effort: "low" },
-                system: systemPrompt,
+                system: systemPrompt + extraInstruction,
                 messages: messages.map(({ attachments, text }) => ({
                     role: "user",
                     content: [
